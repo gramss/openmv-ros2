@@ -1,0 +1,10 @@
+#goal definition
+int16 function # Enum starting with 0: [Take High_Res Picture, High_Res Stream, Low_Res Stream, Find QR-Codes, Read QR-Code, Detect Visual Motion, FLIR (secondary camera)
+---
+#result definition
+std_msgs/Empty result
+# string metadata?
+---
+#feedback definition
+int16 status # Enum: 0:Starting Function, 1:Function Running, 2:Sensor Finished, 3:Writing results, 4:Fatal Error, 5:Device not connected
+#int8 progress # 0: 0%, 7: 100%
