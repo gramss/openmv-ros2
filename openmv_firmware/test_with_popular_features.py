@@ -8,89 +8,19 @@
 
 import image, network, math, rpc, sensor, struct, tf
 
-#import utime
-#from pyb import LED
+TRIGGER_THRESHOLD = 5
 
-#led = LED(2)
-#led.on()
-#utime.sleep(3)
-#led.off()
-#led = LED(3)
-#led.on()
-#utime.sleep_ms(500)
-#led.off()
+BG_UPDATE_FRAMES = 50 # How many frames before blending.
+BG_UPDATE_BLEND = 128 # How much to blend by... ([0-256]==[0.0-1.0]).
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QVGA)
 sensor.skip_frames(time = 2000)
 
-# The RPC library above is installed on your OpenMV Cam and provides mutliple classes for
-# allowing your OpenMV Cam to be controlled over CAN, I2C, SPI, UART, USB VCP, or WiFi.
+extra_fb = None
 
-################################################################
-# Choose the interface you wish to control your OpenMV Cam over.
-################################################################
-
-# Uncomment the below line to setup your OpenMV Cam for control over CAN.
-#
-# * message_id - CAN message to use for data transport on the can bus (11-bit).
-# * bit_rate - CAN bit rate.
-# * sampling_point - Tseg1/Tseg2 ratio. Typically 75%. (50.0, 62.5, 75, 87.5, etc.)
-#
-# NOTE: Master and slave message ids and can bit rates must match. Connect master can high to slave
-#       can high and master can low to slave can lo. The can bus must be terminated with 120 ohms.
-#
-# interface = rpc.rpc_can_slave(message_id=0x7FF, bit_rate=250000, sampling_point=75)
-
-# Uncomment the below line to setup your OpenMV Cam for control over I2C.
-#
-# * slave_addr - I2C address.
-#
-# NOTE: Master and slave addresses must match. Connect master scl to slave scl and master sda
-#       to slave sda. You must use external pull ups. Finally, both devices must share a ground.
-#
-# interface = rpc.rpc_i2c_slave(slave_addr=0x12)
-
-# Uncomment the below line to setup your OpenMV Cam for control over SPI.
-#
-# * cs_pin - Slave Select Pin.
-# * clk_polarity - Idle clock level (0 or 1).
-# * clk_phase - Sample data on the first (0) or second edge (1) of the clock.
-#
-# NOTE: Master and slave settings much match. Connect CS, SCLK, MOSI, MISO to CS, SCLK, MOSI, MISO.
-#       Finally, both devices must share a common ground.
-#
-# interface = rpc.rpc_spi_slave(cs_pin="P3", clk_polarity=1, clk_phase=0)
-
-# Uncomment the below line to setup your OpenMV Cam for control over UART.
-#
-# * baudrate - Serial Baudrate.
-#
-# NOTE: Master and slave baud rates must match. Connect master tx to slave rx and master rx to
-#       slave tx. Finally, both devices must share a common ground.
-#
-#interface = rpc.rpc_uart_slave(baudrate=115200)
-
-# Uncomment the below line to setup your OpenMV Cam for control over a USB VCP.
-#
-interface = rpc.rpc_usb_vcp_slave()
-
-# Uncomment the below line to setup your OpenMV Cam for control over WiFi.
-#
-# * ssid - WiFi network to connect to.
-# * ssid_key - WiFi network password.
-# * ssid_security - WiFi security.
-# * port - Port to route traffic to.
-# * mode - Regular or access-point mode.
-# * static_ip - If not None then a tuple of the (IP Address, Subnet Mask, Gateway, DNS Address)
-#
-# interface = rpc.rpc_wifi_slave(ssid="",
-#                                ssid_key="",
-#                                ssid_security=network.WINC.WPA_PSK,
-#                                port=0x1DBA,
-#                                mode=network.WINC.MODE_STA,
-#                                static_ip=None)
+interface = rpc.rpc_i2c_slave() # rpc_usb_vcp_slave()
 
 ################################################################
 # Call Backs
@@ -263,21 +193,82 @@ def jpeg_snapshot(data):
     sensor.set_framesize(sensor.QVGA)
     return sensor.snapshot().compress(quality=90).bytearray()
 
+
+##########################################
+#### Flo Functions
+###########
+
+# This is called repeatedly by interface.stream_writer().
+def stream_generator_cb():
+    # sensor.snapshot().compress(quality=90).bytearray()
+    img = sensor.snapshot() # Take a picture and return the image.
+    global extra_fb
+
+    stream_generator_cb.frame_count += 1
+    if (stream_generator_cb.frame_count > BG_UPDATE_FRAMES):
+        stream_generator_cb.frame_count = 0
+        # Blend in new frame. We're doing 256-alpha here because we want to
+        # blend the new frame into the backgound. Not the background into the
+        # new frame which would be just alpha. Blend replaces each pixel by
+        # ((NEW*(alpha))+(OLD*(256-alpha)))/256. So, a low alpha results in
+        # low blending of the new image while a high alpha results in high
+        # blending of the new image. We need to reverse that for this update.
+        img.blend(extra_fb, alpha=(256-BG_UPDATE_BLEND))
+        extra_fb.replace(img)
+
+    # Replace the image with the "abs(NEW-OLD)" frame difference.
+    img.difference(extra_fb)
+
+    hist = img.get_histogram()
+    # This code below works by comparing the 99th percentile value (e.g. the
+    # non-outlier max value against the 90th percentile value (e.g. a non-max
+    # value. The difference between the two values will grow as the difference
+    # image seems more pixels change.
+    diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
+    triggered = diff > TRIGGER_THRESHOLD
+
+    return img.compress(quality=90).bytearray().extend(triggered.to_bytes(length=1, byteorder='big'))
+
+
+# Transmits a stream of bytes()'s generated by stream_generator_cb to the master device.
+def mov_jpeg_image_stream_cb():
+    stream_generator_cb.frame_count = 0
+    interface.stream_writer(stream_generator_cb)
+
+# When called sets the pixformat and framesize, and then schedules
+# frame streaming to start after the RPC call finishes.
+#
+# data is a pixformat string and framesize string.
+def movement_im_stream(data):
+    sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
+    sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
+    sensor.set_auto_whitebal(False) # Turn off white balance.
+    global extra_fb
+    extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
+    extra_fb.replace(sensor.snapshot()) # set bg-image for diff
+    interface.schedule_callback(jpeg_image_stream_cb)
+    return "Ready".encode()
+
+def setup_undo_move_settings(data):
+    sensor.set_auto_whitebal(True)
+    sensor.dealloc_extra_fb()
 # Register call backs.
 
 interface.register_callback(face_detection)
-interface.register_callback(person_detection)
-interface.register_callback(qrcode_detection)
-interface.register_callback(all_qrcode_detection)
-interface.register_callback(apriltag_detection)
-interface.register_callback(all_apriltag_detection)
-interface.register_callback(datamatrix_detection)
-interface.register_callback(all_datamatrix_detection)
-interface.register_callback(barcode_detection)
-interface.register_callback(all_barcode_detection)
+#interface.register_callback(person_detection)
+#interface.register_callback(qrcode_detection)
+#interface.register_callback(all_qrcode_detection)
+#interface.register_callback(apriltag_detection)
+#interface.register_callback(all_apriltag_detection)
+#interface.register_callback(datamatrix_detection)
+#interface.register_callback(all_datamatrix_detection)
+#interface.register_callback(barcode_detection)
+#interface.register_callback(all_barcode_detection)
 interface.register_callback(color_detection)
 interface.register_callback(jpeg_snapshot)
 interface.register_callback(flo_test)
+interface.register_callback(movement_im_stream)
+interface.register_callback(setup_undo_move_settings)
 
 # Once all call backs have been registered we can start
 # processing remote events. interface.loop() does not return.

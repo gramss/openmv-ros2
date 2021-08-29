@@ -76,7 +76,7 @@ while(True):
     # by modifying the below arguments.
     result = interface.call("jpeg_image_stream", "sensor.RGB565,sensor.QQVGA")
     if result is not None:
-
+        print("Here I am again!!")
         # THE REMOTE DEVICE WILL START STREAMING ON SUCCESS. SO, WE NEED TO RECEIVE DATA IMMEDIATELY.
         interface.stream_reader(jpg_frame_buffer_cb, queue_depth=8)
 

@@ -180,7 +180,7 @@ def exe_jpeg_snapshot():
 # Executing multiple at a time may run slowly if the camera needs to change camera modes
 # per execution.
 
-#while(True):
+while(True):
     # exe_face_detection() # Face should be about 2ft away.
     # exe_person_detection()
     # exe_qrcode_detection() # Place the QRCode about 2ft away.
@@ -191,8 +191,8 @@ def exe_jpeg_snapshot():
     # exe_all_datamatrix_detection() # Place the Datamatrix about 2ft away.
     # exe_barcode_detection() # Place the Barcode about 2ft away.
     # exe_all_barcode_detection() # Place the Barcode about 2ft away.
-    # exe_color_detection()
-#    print(exe_jpeg_snapshot())
+    exe_color_detection()
+    #exe_jpeg_snapshot()
 
 #    sleep(1)
     # exe_flo_test()

@@ -113,11 +113,11 @@ class rpc:
     def put_bytes(self, data, timeout_ms): # protected
         pass
 
-    def stream_reader(self, call_back, queue_depth=1, read_timeout_ms=5000): # public
+    def stream_reader(self, call_back, queue_depth=1, read_timeout_ms=5000, keep_looping=True): # public
         try: self._stream_put_bytes(self._set_packet(0xEDF6, struct.pack("<I", queue_depth)), 1000)
         except OSError: return
         tx_lfsr = 255
-        while True:
+        while True and keep_looping is True:
             packet = self._stream_get_bytes(bytearray(8), 1000)
             if packet is None: return
             magic = packet[0] | (packet[1] << 8)

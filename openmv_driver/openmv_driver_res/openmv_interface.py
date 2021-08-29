@@ -109,25 +109,32 @@ class OMV_CAM:
         if result is not None and len(result):
             print("Largest Color Detected [cx=%d, cy=%d]" % struct.unpack("<HH", result))
 
-    def exe_jpeg_snapshot(self, goal_handle):
-        #self.get_logger().info("Now Calling")
+    def exe_jpeg_snapshot(self, logger):
+        logger.info("Now Calling")
         result = self.omv_interface.call("jpeg_snapshot")
-        #self.get_logger().info("Calling done!")
+        logger.info("Calling done!")
         if result is not None:
-            #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
-            try:
-                im = PILImage.frombuffer("RGB",
-                                        (320,240),
-                                        result.tobytes(), "jpeg", "RGB", "")
-                b, g, r = im.split()
-                im = PILImage.merge("RGB", (r, g, b))
-                return im
-            except Exception as e:
+            logger.info("sending result to helper")
+            print(result)
+            return self.helper_bytes_to_image_raw(result)
+
+
+    def exe_im_stream(self):
+        result = self.omv_interface.call("movement_im_stream")
+        if result is not None:
+            return True
+        return False
+
+
+
+    def helper_bytes_to_image_raw(im_bytes, width=320, height=240):
+        #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
+        try:
+            im = PILImage.frombuffer("RGB",
+                                    (width,height),
+                                    im_bytes.tobytes(), "jpeg", "RGB", "")
+            b, g, r = im.split()
+            return PILImage.merge("RGB", (r, g, b))
+        except Exception as e:
                 print ("Exception loading PILImage.frombuffer: ", e)
                 return None
-            
-            
-            #name = "snapshot-%s.jpg" % datetime.now().strftime("%d.%m.%Y-%H.%M.%S")
-            #print("Writing jpeg %s..." % name)
-            #with open(name, "wb") as snap:
-            #    snap.write(result)

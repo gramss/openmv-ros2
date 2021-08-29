@@ -21,7 +21,7 @@
 import time
 
 from openmv_msgs.action import Control
-from openmv_msgs.msg import QRCode
+from openmv_msgs.msg import QRCode, MovementTrigger
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -39,6 +39,7 @@ class OpenMVDriverActionServer(Node):
         super().__init__('openmv_driver')
         self._goal_handle = None
         self._active_sub_node = None
+        self._active_coroutine = None
         self._action_server = ActionServer(
             self,
             Control,
@@ -69,11 +70,17 @@ class OpenMVDriverActionServer(Node):
             # Abort the existing goal
             self._goal_handle.abort()
         
+        if self._active_coroutine is True:
+            self._active_coroutine = None
+            time.sleep(5) #let stream_event in OpenMV cam go into timeout
+
         if self._active_sub_node is not None:
             self.get_logger().info('Removing previous sub node from executor')
             self.executor.remove_node(self._active_sub_node)
             self._active_sub_node.destroy_node()
+            self._active_sub_node = None
         
+
         self._goal_handle = goal_handle
         # Start goal execution right away
         goal_handle.execute()
@@ -98,24 +105,16 @@ class OpenMVDriverActionServer(Node):
 
         if fct_id == 0:
             
-            self.cam.exe_flo_test(self)
+            self.cam.exe_flo_test()
         elif fct_id ==1:
-            node = rclpy.create_node(self.get_name() + "image_normal", use_global_arguments=False, start_parameter_services=False)
-            publisher = node.create_publisher(Image, 'image', 10)
+            node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
+            im_pub = node.create_publisher(Image, 'image', 10)
             width = 320
-            heigth = 240
+            height = 240
 
             def timer_cb():
-                im = self.cam.exe_jpeg_snapshot(gh)
-                rawmsg = Image()
-                rawmsg.header.frame_id = "map"
-                rawmsg.header.stamp = node.get_clock().now().to_msg()
-                rawmsg.width = width
-                rawmsg.height = heigth
-                rawmsg.encoding = "bgr8"
-                rawmsg.data = im.tobytes()
-                rawmsg.step = int(len(rawmsg.data)/rawmsg.height)
-                publisher.publish(rawmsg)
+                im = self.cam.exe_jpeg_snapshot(node.get_logger())
+                self.pub_raw_image(node, im, im_pub, width, height)
 
             timer_period = 0.5  # seconds
             timer = node.create_timer(timer_period, timer_cb)
@@ -123,6 +122,7 @@ class OpenMVDriverActionServer(Node):
             self._active_sub_node = node
 
         elif fct_id == 2:
+            #never tested
             node = rclpy.create_node(self.get_name() + "qrcode", use_global_arguments=False, start_parameter_services=False)
             publisher = node.create_publisher(QRCode, 'qrcode', 10)
             
@@ -140,8 +140,52 @@ class OpenMVDriverActionServer(Node):
             exec.add_node(node)
             self._active_sub_node = node
 
+        elif fct_id == 3:
+            node = rclpy.create_node(self.get_name() + "_movement", use_global_arguments=False, start_parameter_services=False)
+            im_pub = node.create_publisher(Image, "move_diff_image", 10) 
+            trigger_pub = node.create_publisher(MovementTrigger, "movement_trigger", 10)
             
+            width = 320
+            height = 240
+            
+            self._active_coroutine = True
 
+            def stream_cb(data):
+                data = data.tobytes()
+                trigger = data[-1:] #tailing byte is trigger byte
+                im_bytes = data[0:-1] #rest is image as jpg
+                im = self.cam.helper_bytes_to_image_raw(im_bytes)
+                self.pub_raw_image(node, im, im_pub, width, height)
+
+                
+                msg = MovementTrigger()
+                msg.trigger = trigger
+                trigger_pub.publish(msg)
+
+
+
+            async def stream_movement():
+                while rclpy.ok() and self._active_coroutine is True:
+                    res = self.cam.exe_im_stream()
+                    if res is not None:
+                        self.cam.omv_interface.stream_reader(stream_cb, 
+                            queue_depth=8, 
+                            read_timeout_ms=2500,
+                            keep_looping=self._active_coroutine)
+                        node.get_logger().info("Finished openmv stream_loop")
+                    else:
+                        node.get_logger().error("Could not start stream")
+                        return False
+                        
+                
+
+                        
+            
+            exec.add_node(node)
+            self._active_sub_node = node
+            self._active_coroutine = True
+            exec.create_task(stream_movement)
+            
 
         #please put in enum-switch that is not ultimativ ugly...
         # also put in ref to self / node, so that the exe_fct. can add publisher and stuff
@@ -161,6 +205,17 @@ class OpenMVDriverActionServer(Node):
         feedback_msg = Control.Feedback()
         feedback_msg.status = status_code
         goal_handle.publish_feedback(feedback_msg)
+
+    def pub_raw_image(self, node, im, publisher, width, height):
+        rawmsg = Image()
+        rawmsg.header.frame_id = "map" #Needs to be changed.. But to what?! :D
+        rawmsg.header.stamp = node.get_clock().now().to_msg()
+        rawmsg.width = width
+        rawmsg.height = height
+        rawmsg.encoding = "bgr8"
+        rawmsg.data = im.tobytes()
+        rawmsg.step = int(len(rawmsg.data)/rawmsg.height)
+        publisher.publish(rawmsg)
 
 def main(args=None):
     rclpy.init(args=args)
