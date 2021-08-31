@@ -21,14 +21,27 @@ except NameError: pass
 #
 # * port - Serial Port Name.
 #
+# print("\nAvailable Ports:\n")
+# for port, desc, hwid in serial.tools.list_ports.comports():
+#     print("{} : {} [{}]".format(port, desc, hwid))
+# sys.stdout.write("\nPlease enter a port name: ")
+# sys.stdout.flush()
+# interface = rpc.rpc_usb_vcp_master(port=input())
+# print("")
+# sys.stdout.flush()
+
+# * port - Serial Port Name.
+# * baudrate - Bits per second.
+#
 print("\nAvailable Ports:\n")
 for port, desc, hwid in serial.tools.list_ports.comports():
     print("{} : {} [{}]".format(port, desc, hwid))
 sys.stdout.write("\nPlease enter a port name: ")
 sys.stdout.flush()
-interface = rpc.rpc_usb_vcp_master(port=input())
+interface = rpc.rpc_uart_master(port=input(), baudrate=115200)
 print("")
 sys.stdout.flush()
+
 
 # Uncomment the below line to setup your OpenMV Cam for controlling over WiFi.
 #

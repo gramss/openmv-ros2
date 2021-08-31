@@ -150,13 +150,15 @@ def exe_sanity_check():
     result = interface.call("sanity_check")
     if result is not None:
         return result.tobytes()
-    
+
+def jpg_frame_buffer_cb(data):
+    print ("got data!")
 
 # Execute remote functions in a loop. Please choose and uncomment one remote function below.
 # Executing multiple at a time may run slowly if the camera needs to change camera modes
 # per execution.
 
-while(True):
+#while(True):
     # exe_face_detection() # Face should be about 2ft away.
     # exe_person_detection()
     # exe_qrcode_detection() # Place the QRCode about 2ft away.
@@ -169,5 +171,9 @@ while(True):
     # exe_all_barcode_detection() # Place the Barcode about 2ft away.
     #exe_color_detection()
     #print(exe_jpeg_snapshot())
-    print(exe_sanity_check())
-    print(interface.call("movement_im_stream"))
+print(exe_sanity_check())
+result = interface.call("movement_im_stream")
+if result is not None:
+    print("Here I am again!!")
+    # THE REMOTE DEVICE WILL START STREAMING ON SUCCESS. SO, WE NEED TO RECEIVE DATA IMMEDIATELY.
+    interface.stream_reader(jpg_frame_buffer_cb, queue_depth=8)
