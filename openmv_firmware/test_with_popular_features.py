@@ -20,7 +20,7 @@ sensor.skip_frames(time = 2000)
 
 extra_fb = None
 
-interface = rpc.rpc_i2c_slave() # rpc_usb_vcp_slave()
+interface = rpc.rpc_uart_slave(baudrate=9600) #rpc_usb_vcp_slave()
 
 ################################################################
 # Call Backs
@@ -254,6 +254,10 @@ def setup_undo_move_settings(data):
     sensor.dealloc_extra_fb()
 # Register call backs.
 
+def sanity_check(data):
+        print("Sanity!")
+        return  "42".encode()
+
 interface.register_callback(face_detection)
 #interface.register_callback(person_detection)
 #interface.register_callback(qrcode_detection)
@@ -269,6 +273,7 @@ interface.register_callback(jpeg_snapshot)
 interface.register_callback(flo_test)
 interface.register_callback(movement_im_stream)
 interface.register_callback(setup_undo_move_settings)
+interface.register_callback(sanity_check)
 
 # Once all call backs have been registered we can start
 # processing remote events. interface.loop() does not return.
