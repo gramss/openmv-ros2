@@ -5,15 +5,11 @@
 # This script is meant to talk to the "popular_features_as_the_remote_device.py" on the OpenMV Cam.
 
 import json, rpc, serial, serial.tools.list_ports, struct, sys
-from time import sleep
 from datetime import datetime
 
 # Fix Python 2.x.
 try: input = raw_input
 except NameError: pass
-
-import PIL
-from PIL import Image as PILImage
 
 ##############################################################
 # Choose the interface you wish to control an OpenMV Cam over.
@@ -22,18 +18,15 @@ from PIL import Image as PILImage
 # Uncomment the below lines to setup your OpenMV Cam for controlling over a USB VCP.
 #
 # * port - Serial Port Name.
-# #
-# print("\nAvailable Ports:\n")
-# for port, desc, hwid in serial.tools.list_ports.comports():
-#     print("{} : {} [{}]".format(port, desc, hwid))
-# sys.stdout.write("\nPlease enter a port name: ")
-# sys.stdout.flush()
-# interface = rpc.rpc_usb_vcp_master(port=input())
-# print("")
-# sys.stdout.flush()
-
-interface = rpc.rpc_usb_vcp_master("/dev/ttyACM0")
-
+#
+print("\nAvailable Ports:\n")
+for port, desc, hwid in serial.tools.list_ports.comports():
+    print("{} : {} [{}]".format(port, desc, hwid))
+sys.stdout.write("\nPlease enter a port name: ")
+sys.stdout.flush()
+interface = rpc.rpc_usb_vcp_master(port=input())
+print("And go!")
+sys.stdout.flush()
 
 # Uncomment the below line to setup your OpenMV Cam for controlling over WiFi.
 #
@@ -88,13 +81,6 @@ def exe_person_detection():
     result = interface.call("person_detection")
     if result is not None:
         print(result.tobytes())
-
-def exe_flo_test():
-    result = interface.call("flo_test")
-    if result is not None:
-        print(result.tobytes())
-    else:
-        print("nope!")
 
 def exe_qrcode_detection():
     result = interface.call("qrcode_detection")
@@ -153,28 +139,18 @@ def exe_color_detection():
         print("Largest Color Detected [cx=%d, cy=%d]" % struct.unpack("<HH", result))
 
 def exe_jpeg_snapshot():
-    # result = interface.call("jpeg_snapshot")
-    # if result is not None:
-    #     name = "snapshot-%s.jpg" % datetime.now().strftime("%d.%m.%Y-%H.%M.%S")
-    #     print("Writing jpeg %s..." % name)
-    #     with open(name, "wb") as snap:
-    #         snap.write(result)
     result = interface.call("jpeg_snapshot")
-    #self.get_logger().info("Calling done!")
-    
     if result is not None:
-    #     #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
-        return result
-        try:
-            im = PILImage.frombuffer("RGB",
-                                    (320,240),
-                                    bytes(result), "jpeg", "RGB", "")
-            b, g, r = im.split()
-            im = PILImage.merge("RGB", (r, g, b))
-            return im
-        except Exception as e:
-            print ("Exception loading PILImage.frombuffer: ", e)
-            return None
+        name = "snapshot-%s.jpg" % datetime.now().strftime("%d.%m.%Y-%H.%M.%S")
+        print("Writing jpeg %s..." % name)
+        #with open(name, "wb") as snap:
+        #    snap.write(result)
+
+def exe_sanity_check():
+    result = interface.call("sanity_check")
+    if result is not None:
+        return result.tobytes()
+    
 
 # Execute remote functions in a loop. Please choose and uncomment one remote function below.
 # Executing multiple at a time may run slowly if the camera needs to change camera modes
@@ -191,8 +167,7 @@ while(True):
     # exe_all_datamatrix_detection() # Place the Datamatrix about 2ft away.
     # exe_barcode_detection() # Place the Barcode about 2ft away.
     # exe_all_barcode_detection() # Place the Barcode about 2ft away.
-    exe_color_detection()
-    #exe_jpeg_snapshot()
-
-#    sleep(1)
-    # exe_flo_test()
+    #exe_color_detection()
+    #print(exe_jpeg_snapshot())
+    print(exe_sanity_check())
+    print(interface.call("movement_im_stream"))

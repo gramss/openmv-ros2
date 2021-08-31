@@ -36,70 +36,60 @@ class OMV_CAM:
     # Call Back Handlers - from openmv.io - see rpc folder for license
     ##############################################################
 
-    def exe_face_detection(self):
-        result = self.omv_interface.call("face_detection")
-        if result is not None and len(result):
-            print("Largest Face Detected [x=%d, y=%d, w=%d, h=%d]" % struct.unpack("<HHHH", result))
-
-    def exe_person_detection(self):
-        result = self.omv_interface.call("person_detection")
-        if result is not None:
-            print(result.tobytes())
-
-    def exe_flo_test(self):
-        result = self.omv_interface.call("flo_test")
+    def exe_sanity_check(self):
+        result = self.omv_interface.call("sanity_check")
         if result is not None:
             print(result.tobytes())
         else:
             print("nope!")
 
-    def exe_qrcode_detection(self):
-        result = self.omv_interface.call("qrcode_detection")
-        if result is not None and len(result):
-            return(result.tobytes())
+    # def exe_qrcode_detection(self):
+    #     result = self.omv_interface.call("qrcode_detection")
+    #     if result is not None and len(result):
+    #         return(result.tobytes())
 
-    def exe_all_qrcode_detection(self):
-        result = self.omv_interface.call("all_qrcode_detection")
-        if result is not None and len(result):
-            print("QR Codes Detected:")
-            for obj in json.loads(result.tobytes()):
-                print(obj)
+    # def exe_all_qrcode_detection(self):
+    #     result = self.omv_interface.call("all_qrcode_detection")
+    #     if result is not None and len(result):
+    #         print("QR Codes Detected:")
+    #         for obj in json.loads(result.tobytes()):
+    #             print(obj)
 
-    def exe_apriltag_detection(self):
-        result = self.omv_interface.call("apriltag_detection")
-        if result is not None and len(result):
-            print("Largest Tag Detected [cx=%d, cy=%d, id=%d, rot=%d]" % struct.unpack("<HHHH",result))
+    # def exe_apriltag_detection(self):
+    #     result = self.omv_interface.call("apriltag_detection")
+    #     if result is not None and len(result):
+    #         print("Largest Tag Detected [cx=%d, cy=%d, id=%d, rot=%d]" % struct.unpack("<HHHH",result))
 
-    def exe_all_apriltag_detection(self):
-        result = self.omv_interface.call("all_apriltag_detection")
-        if result is not None and len(result):
-            print("Tags Detected:")
-            for obj in json.loads(result.tobytes()):
-                print(obj)
+    # def exe_all_apriltag_detection(self):
+    #     result = self.omv_interface.call("all_apriltag_detection")
+    #     if result is not None and len(result):
+    #         print("Tags Detected:")
+    #         for obj in json.loads(result.tobytes()):
+    #             print(obj)
 
-    def exe_datamatrix_detection(self):
-        result = self.omv_interface.call("datamatrix_detection")
-        if result is not None and len(result):
-            print(result.tobytes())
+    # def exe_datamatrix_detection(self):
+    #     result = self.omv_interface.call("datamatrix_detection")
+    #     if result is not None and len(result):
+    #         print(result.tobytes())
 
-    def exe_all_datamatrix_detection(self):
-        result = self.omv_interface.call("all_datamatrix_detection")
-        if result is not None and len(result):
-            print("Data Matrices Detected:")
-            for obj in json.loads(result.tobytes()):
-                print(obj)
+    # def exe_all_datamatrix_detection(self):
+    #     result = self.omv_interface.call("all_datamatrix_detection")
+    #     if result is not None and len(result):
+    #         print("Data Matrices Detected:")
+    #         for obj in json.loads(result.tobytes()):
+    #             print(obj)
 
-    def exe_barcode_detection(self):
-        result = self.omv_interface.call("barcode_detection")
-        if result is not None and len(result):
-            print(result.tobytes())
+    # def exe_barcode_detection(self):
+    #     result = self.omv_interface.call("barcode_detection")
+    #     if result is not None and len(result):
+    #         print(result.tobytes())
 
-    def exe_all_barcode_detection(self):
-        result = self.omv_interface.call("all_barcode_detection")
-        if result is not None and len(result):
-            print("Bar Codes Detected:")
-            for obj in json.loads(result.tobytes()):
-                print(obj)
+    # def exe_all_barcode_detection(self):
+    #     result = self.omv_interface.call("all_barcode_detection")
+    #     if result is not None and len(result):
+    #         print("Bar Codes Detected:")
+    #         for obj in json.loads(result.tobytes()):
+    #             print(obj)
 
     def exe_color_detection(self):
         thresholds = (30, 100, 15, 127, 15, 127) # generic red thresholds
@@ -110,12 +100,12 @@ class OMV_CAM:
             print("Largest Color Detected [cx=%d, cy=%d]" % struct.unpack("<HH", result))
 
     def exe_jpeg_snapshot(self, logger):
-        logger.info("Now Calling")
+        #logger.info("Now Calling")
         result = self.omv_interface.call("jpeg_snapshot")
-        logger.info("Calling done!")
+        #logger.info("Calling done!")
         if result is not None:
             logger.info("sending result to helper")
-            print(result)
+            #print(result)
             return self.helper_bytes_to_image_raw(result)
 
 
@@ -127,7 +117,7 @@ class OMV_CAM:
 
 
 
-    def helper_bytes_to_image_raw(im_bytes, width=320, height=240):
+    def helper_bytes_to_image_raw(self, im_bytes, width=320, height=240):
         #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
         try:
             im = PILImage.frombuffer("RGB",

@@ -79,6 +79,7 @@ class OpenMVDriverActionServer(Node):
             self.executor.remove_node(self._active_sub_node)
             self._active_sub_node.destroy_node()
             self._active_sub_node = None
+            time.sleep(5)
         
 
         self._goal_handle = goal_handle
@@ -105,7 +106,7 @@ class OpenMVDriverActionServer(Node):
 
         if fct_id == 0:
             
-            self.cam.exe_flo_test()
+            self.cam.exe_sanity_check()
         elif fct_id ==1:
             node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, 'image', 10)

@@ -117,7 +117,7 @@ class rpc:
         try: self._stream_put_bytes(self._set_packet(0xEDF6, struct.pack("<I", queue_depth)), 1000)
         except OSError: return
         tx_lfsr = 255
-        while True and keep_looping is True:
+        while (True and keep_looping is True):
             packet = self._stream_get_bytes(bytearray(8), 1000)
             if packet is None: return
             magic = packet[0] | (packet[1] << 8)
