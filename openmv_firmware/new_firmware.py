@@ -56,9 +56,11 @@ class ROS2_Interface:
     def stream_generator_cb(self):
         # sensor.snapshot().compress(quality=90).bytearray()
         img = sensor.snapshot() # Take a picture and return the image.
-
+        #print("Fram_count: ")
+        #print(self.frame_count)
         self.frame_count += 1
         if (self.frame_count > self.BG_UPDATE_FRAMES):
+            #print("Fram_count to zero")
             self.frame_count = 0
             # Blend in new frame. We're doing 256-alpha here because we want to
             # blend the new frame into the backgound. Not the background into the
@@ -80,6 +82,8 @@ class ROS2_Interface:
         diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
         triggered = diff > self.TRIGGER_THRESHOLD
 
+        return img.compress(quality=90).bytearray()
+
         #prepare bytearray() to send as stream - bytearray() is actually just a ref to heap, so extending means copying which is "bad". See Issue
         compr = img.compress(quality=90).bytearray()
         t = bytearray({triggered})
@@ -97,21 +101,32 @@ class ROS2_Interface:
     def mov_jpeg_image_stream_cb(self):
         self.frame_count = 0
         self.interface.stream_writer(self.stream_generator_cb)
+        self.setup_undo_move_settings()
 
     # When called sets the pixformat and framesize, and then schedules
     # frame streaming to start after the RPC call finishes.
     #
     # data is a pixformat string and framesize string.
     def movement_im_stream(self, data):
+        self.interface.schedule_callback(self.mov_jpeg_image_stream_cb)
+        return "Ready".encode()
+
+    def setup_move_settings(self, data):
         sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
         sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
         sensor.set_auto_whitebal(False) # Turn off white balance.
 
         self.extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
+        print("About to save background image...")
+        sensor.skip_frames(time = 2000) # Give the user time to get ready.
         self.extra_fb.replace(sensor.snapshot()) # set bg-image for diff
-        self.interface.schedule_callback(self.mov_jpeg_image_stream_cb)
-        return "Ready".encode()
+        print("done setup im")
+        return "worked".encode()
 
+    def setup_undo_move_settings(self):
+        sensor.set_auto_whitebal(True)
+        sensor.dealloc_extra_fb()
+        print("dealloc done")
 
     def register_callbacks(self):
         #self.interface.register_callback(face_detection)
@@ -127,6 +142,7 @@ class ROS2_Interface:
         #self.interface.register_callback(color_detection)
         self.interface.register_callback(self.jpeg_snapshot)
         self.interface.register_callback(self.sanity_check)
+        self.interface.register_callback(self.setup_move_settings)
         self.interface.register_callback(self.movement_im_stream)
         self.interface.register_callback(self.setup_cam_rgb_QVGA)
         print("done registering callbacks")

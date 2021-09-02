@@ -152,22 +152,26 @@ class OpenMVDriverActionServer(Node):
             self._active_coroutine = True
 
             def stream_cb(data):
-                data = data.tobytes()
-                trigger = data[-1:] #tailing byte is trigger byte
-                im_bytes = data[0:-1] #rest is image as jpg
-                im = self.cam.helper_bytes_to_image_raw(im_bytes)
+                #node.get_logger().info("stream_cb says hi")
+                #trigger = data[-1:] #tailing byte is trigger byte
+                #im_bytes = data[0:-1] #rest is image as jpg
+                print(type(data))
+                im = self.cam.helper_bytes_to_image_raw(bytes(data)) #im_bytes)
                 self.pub_raw_image(node, im, im_pub, width, height)
 
                 
-                msg = MovementTrigger()
-                msg.trigger = trigger
-                trigger_pub.publish(msg)
+                #msg = MovementTrigger()
+                #msg.trigger = trigger
+                #trigger_pub.publish(msg)
 
 
 
             async def stream_movement():
-                while rclpy.ok() and self._active_coroutine is True:
+                #while rclpy.ok() and self._active_coroutine is True:
+                if self.cam.exe_setup_im_stream():
                     res = self.cam.exe_im_stream()
+                    #time.sleep(2) #wait til cam gets ready..!
+                    node.get_logger().info("Active_coroutine?= " + str(self._active_coroutine))
                     if res is not None:
                         self.cam.omv_interface.stream_reader(stream_cb, 
                             queue_depth=8, 
@@ -177,6 +181,9 @@ class OpenMVDriverActionServer(Node):
                     else:
                         node.get_logger().error("Could not start stream")
                         return False
+                else:
+                    node.get_logger().warn("Failed to setup cam for stream_movement")
+                    return False
                         
                 
 

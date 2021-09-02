@@ -106,8 +106,14 @@ class OMV_CAM:
         if result is not None:
             logger.info("sending result to helper")
             #print(result)
-            return self.helper_bytes_to_image_raw(result)
+            return self.helper_bytes_to_image_raw(result.tobytes())
 
+
+    def exe_setup_im_stream(self):
+        result = self.omv_interface.call("setup_move_settings", recv_timeout=4000)
+        if result is not None:
+            return True
+        return False
 
     def exe_im_stream(self):
         result = self.omv_interface.call("movement_im_stream")
@@ -122,7 +128,7 @@ class OMV_CAM:
         try:
             im = PILImage.frombuffer("RGB",
                                     (width,height),
-                                    im_bytes.tobytes(), "jpeg", "RGB", "")
+                                    im_bytes, "jpeg", "RGB", "")
             b, g, r = im.split()
             return PILImage.merge("RGB", (r, g, b))
         except Exception as e:
