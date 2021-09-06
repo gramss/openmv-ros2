@@ -31,17 +31,18 @@ class OMV_CAM:
         """
         self.omv_name = name
         self.omv_interface = rpc.rpc_usb_vcp_master(port)
+        
 
     ##############################################################
     # Call Back Handlers - from openmv.io - see rpc folder for license
     ##############################################################
 
     def exe_sanity_check(self):
-        result = self.omv_interface.call("sanity_check")
-        if result is not None:
-            print(result.tobytes())
-        else:
-            print("nope!")
+        return self.omv_interface.call("sanity_check")
+        # if result is not None:
+        #     print(result.tobytes())
+        # else:
+        #     print("nope!")
 
     # def exe_qrcode_detection(self):
     #     result = self.omv_interface.call("qrcode_detection")
@@ -107,6 +108,8 @@ class OMV_CAM:
             logger.info("sending result to helper")
             #print(result)
             return self.helper_bytes_to_image_raw(result.tobytes())
+        else:
+            return False
 
 
     def exe_setup_im_stream(self):
@@ -121,6 +124,8 @@ class OMV_CAM:
             return True
         return False
 
+    def exe_mov_triggered(self):
+        return self.omv_interface.call("mov_triggered")
 
 
     def helper_bytes_to_image_raw(self, im_bytes, width=320, height=240):

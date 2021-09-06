@@ -40,6 +40,7 @@ class OpenMVDriverActionServer(Node):
         self._goal_handle = None
         self._active_sub_node = None
         self._active_coroutine = None
+        self._future_coroutine = None
         self._action_server = ActionServer(
             self,
             Control,
@@ -50,8 +51,8 @@ class OpenMVDriverActionServer(Node):
             goal_callback=self.goal_callback,
             cancel_callback=self.cancel_callback)
         
-        self.cam = oi.OMV_CAM(name="normal", port="/dev/ttyACM0")
-        # self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+        self.cam = None #oi.OMV_CAM(name="normal", port="/dev/ttyACM0")
+        self.cam_FLIR = None #oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
 
     def destroy(self):
         self._action_server.destroy()
@@ -72,6 +73,8 @@ class OpenMVDriverActionServer(Node):
         
         if self._active_coroutine is True:
             self._active_coroutine = None
+            #self.executor.spin_until_future_complete(self._future_coroutine)
+            self._future_coroutine = None
             time.sleep(5) #let stream_event in OpenMV cam go into timeout
 
         if self._active_sub_node is not None:
@@ -105,17 +108,36 @@ class OpenMVDriverActionServer(Node):
         
 
         if fct_id == 0:
-            
-            self.cam.exe_sanity_check()
+            result = self.cam.exe_sanity_check()
+            if result is not None:
+                self.get_logger().info("Sanity call - success: " + str(result.tobytes()))
+                goal_handle.succeed()
+                return self.generate_result()
+            else:
+                #self.give_feedback(gh,3)
+                goal_handle.abort()
+                # Is a return needed..?
+                return self.generate_result()
+
         elif fct_id ==1:
+            # This needs to be rewritten to a streamer like #3 or another function added as a streamer with normal video stream
             node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, 'image', 10)
             width = 320
             height = 240
+            miss_counter = 0
 
             def timer_cb():
                 im = self.cam.exe_jpeg_snapshot(node.get_logger())
-                self.pub_raw_image(node, im, im_pub, width, height)
+                if im is not False:
+                    self.pub_raw_image(node, im, im_pub, width, height)
+                else:
+                    self.get_logger().warn("Missed picture from cam..")
+                    miss_counter =+ 1
+                    if miss_counter > 50:
+                        self.get_logger().error("Too much misses from cam. Dropping 2Hz stream")
+                        goal_handle.abort()
+
 
             timer_period = 0.5  # seconds
             timer = node.create_timer(timer_period, timer_cb)
@@ -144,25 +166,35 @@ class OpenMVDriverActionServer(Node):
         elif fct_id == 3:
             node = rclpy.create_node(self.get_name() + "_movement", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "move_diff_image", 10) 
-            trigger_pub = node.create_publisher(MovementTrigger, "movement_trigger", 10)
+            #trigger_pub = node.create_publisher(MovementTrigger, "movement_trigger", 10)
             
             width = 320
             height = 240
-            
+            miss_counter = 0
+
             self._active_coroutine = True
 
             def stream_cb(data):
                 #node.get_logger().info("stream_cb says hi")
                 #trigger = data[-1:] #tailing byte is trigger byte
-                #im_bytes = data[0:-1] #rest is image as jpg
-                print(type(data))
-                im = self.cam.helper_bytes_to_image_raw(bytes(data)) #im_bytes)
+                #im_byte_arr = data[0:-1] #rest is image as jpg
+                if data is None:
+                    miss_counter =+ 1
+                    if miss_counter > 50:
+                        goal_handle.abort()
+                    return
+
+                #print(type(data))
+                im = self.cam.helper_bytes_to_image_raw(bytes(data)) #im_byte_arr)
+                #im = self.cam.helper_bytes_to_image_raw(bytes(im_byte_arr)) #im_byte_arr)
                 self.pub_raw_image(node, im, im_pub, width, height)
 
-                
-                #msg = MovementTrigger()
-                #msg.trigger = trigger
-                #trigger_pub.publish(msg)
+                # # Does not work that way as we would cancel the stream with a different request.
+                # trigger = self.cam.exe_mov_triggered()
+                # print(type(trigger))
+                # msg = MovementTrigger()
+                # msg.trigger = bool(trigger)
+                # trigger_pub.publish(msg)
 
 
 
@@ -192,18 +224,42 @@ class OpenMVDriverActionServer(Node):
             exec.add_node(node)
             self._active_sub_node = node
             self._active_coroutine = True
-            exec.create_task(stream_movement)
+            self._future_coroutine = exec.create_task(stream_movement)
+            #exec.spin_until_future_complete(self._future_coroutine)
             
+
+        if fct_id == 4: #reset cam
+            if self.cam is not None:
+                del self.cam.omv_interface #.reset()
+                self.cam = None
+            if self.cam_FLIR is not None:
+                self.cam_FLIR.omv_interface.reset()
+                self.cam_FLIR = None
+
+        if fct_id == 5: #start cam 1
+            self.cam = oi.OMV_CAM(name="normal", port="/dev/ttyACM0")    
+
+        if fct_id == 6: #start FLIR Cam 2
+            self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+
 
         #please put in enum-switch that is not ultimativ ugly...
         # also put in ref to self / node, so that the exe_fct. can add publisher and stuff
         # maybe a good thing would be to add a type and name .... hmmmmmmmm
 
-
+        # while (rclpy.ok()):
+        #     self.give_feedback(gh, 1) #everything still fine
+        #     exec.spin_once()
+        #     if self._future_coroutine is not None:
+        #         exec.spin_once_until_future_complete(self._future_coroutine)
+            
         
         
         goal_handle.succeed()
 
+        return self.generate_result()
+
+    def generate_result(self):
         self.get_logger().info('Returning result: (empty)')
         result = Control.Result()
 
