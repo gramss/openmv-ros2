@@ -20,6 +20,8 @@
 
 import time
 
+import serial
+
 from openmv_msgs.action import Control
 from openmv_msgs.msg import QRCode, MovementTrigger
 
@@ -136,13 +138,14 @@ class OpenMVDriverActionServer(Node):
                     miss_counter =+ 1
                     if miss_counter > 50:
                         self.get_logger().error("Too much misses from cam. Dropping 2Hz stream")
-                        goal_handle.abort()
+                        
 
 
             timer_period = 0.5  # seconds
             timer = node.create_timer(timer_period, timer_cb)
             exec.add_node(node)
             self._active_sub_node = node
+            goal_handle.succeed()
 
         elif fct_id == 2:
             #never tested
@@ -225,6 +228,7 @@ class OpenMVDriverActionServer(Node):
             self._active_sub_node = node
             self._active_coroutine = True
             self._future_coroutine = exec.create_task(stream_movement)
+            goal_handle.succeed()
             #exec.spin_until_future_complete(self._future_coroutine)
             
 
@@ -235,12 +239,24 @@ class OpenMVDriverActionServer(Node):
             if self.cam_FLIR is not None:
                 self.cam_FLIR.omv_interface.reset()
                 self.cam_FLIR = None
+            goal_handle.succeed()
 
         if fct_id == 5: #start cam 1
-            self.cam = oi.OMV_CAM(name="normal", port="/dev/ttyACM0")    
+            try:
+                self.cam = oi.OMV_CAM(name="normal", port="/dev/ttyACM0")
+                goal_handle.succeed()   
+            except serial.SerialException as e:
+                self.get_logger().error(e.strerror)
+                goal_handle.abort()
 
         if fct_id == 6: #start FLIR Cam 2
-            self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+            try:
+                self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+                goal_handle.succeed()
+            except serial.SerialException as e:
+                self.get_logger().error(e.strerror)
+                goal_handle.abort()
+
 
 
         #please put in enum-switch that is not ultimativ ugly...
@@ -255,7 +271,7 @@ class OpenMVDriverActionServer(Node):
             
         
         
-        goal_handle.succeed()
+        #goal_handle.succeed()
 
         return self.generate_result()
 
