@@ -30,7 +30,7 @@ class MinimalActionClient(Node):
         result = future.result().result
         status = future.result().status
         if status == GoalStatus.STATUS_SUCCEEDED:
-            self.get_logger().info('Goal succeeded! Result: {0}'.format(result.status))
+            self.get_logger().info('Goal succeeded! Result: {0}'.format(status))
         else:
             self.get_logger().info('Goal failed with status: {0}'.format(status))
 
