@@ -75,7 +75,8 @@ def qrcode_detection(data):
     sensor.set_framesize(sensor.VGA)
     sensor.set_windowing((320, 240))
     codes = sensor.snapshot().find_qrcodes()
-    if not codes: return bytes() # No detections.
+    if not codes: 
+        return bytes() # No detections.
     draw_detections(sensor.get_fb(), codes)
     return max(codes, key = lambda c: c.w() * c.h()).payload().encode()
 
