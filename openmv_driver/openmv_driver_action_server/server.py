@@ -211,9 +211,9 @@ class OpenMVDriverActionServer(Node):
             self.cam.exe_setup_line_detection()
 
             def timer_cb():
-                steering_value = self.cam.exe_line_detection()
+                steering_val = self.cam.exe_line_detection()
                 msg = SteeringValue()
-                msg.data = int(steering_value)
+                msg.steering_value = int(steering_val)
                 publisher.publish(msg)
 
             # Periodically execute the timer callback.
