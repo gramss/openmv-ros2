@@ -212,19 +212,20 @@ class OpenMVDriverActionServer(Node):
 
             def timer_cb():
                 steering_val = self.cam.exe_line_detection()
-                msg = SteeringValue()
-                msg.steering_value = int(steering_val)
-                publisher.publish(msg)
+
+                if steering_val is not None:
+                    msg = SteeringValue()
+                    msg.steering_value = int(steering_val.tobytes())
+                    publisher.publish(msg)
 
             # Periodically execute the timer callback.
-            timer_period = 0.1  # Seconds
+            timer_period = 0.5  # Seconds
             node.create_timer(timer_period, timer_cb)
 
             exec.add_node(node)
             self._active_sub_node = node
 
-        # TODO: please put in enum-switch that is not ultimativ ugly...
-        # also put in ref to self / node, so that the exe_fct. can add publisher and stuff
+        # TODO: put in ref to self / node, so that the exe_fct. can add publisher and stuff
         # maybe a good thing would be to add a type and name .... hmmmmmmmm
 
         goal_handle.succeed()
