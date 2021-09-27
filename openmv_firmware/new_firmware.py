@@ -44,23 +44,26 @@ class ROS2_Interface:
         sensor.set_pixformat(sensor.RGB565)
         sensor.set_framesize(sensor.QVGA)
         sensor.set_auto_whitebal(True)
+        sensor.skip_frames(time=2000)
 
     def setup_line_detection(self, data):
+        roi = (0, 220, 240, 20)  # x, y, w, h
         sensor.set_pixformat(sensor.RGB565)
-        sensor.set_framesize(sensor.VGA)
+        sensor.set_framesize(sensor.QVGA)
         sensor.set_windowing(roi)
         sensor.set_auto_gain(False)  # Must be turned off for color tracking.
         sensor.set_auto_whitebal(False)  # Must be turned off for color tracking.
         sensor.skip_frames(time=2000)
+        return "line detection mode".encode()
 
     def jpeg_snapshot(self, data):
         sensor.set_pixformat(sensor.RGB565)
-        sensor.set_framesize(sensor.QVGA)
+        sensor.set_framesize(sensor.VGA)
         return sensor.snapshot().compress(quality=90).bytearray()
 
     def setup_qr_mode(self, data):
         sensor.set_pixformat(sensor.GRAYSCALE)
-        sensor.set_framesize(sensor.QVGA)
+        sensor.set_framesize(sensor.VGA)
         # Turn auto gain off to prevent image washout.
         sensor.set_auto_gain(False)
         return "qr mode".encode()
@@ -91,31 +94,37 @@ class ROS2_Interface:
         # Return the camera frame (even) if no QR code was detected.
         return img.compress(quality=90).bytearray()
 
-    def get_steering_values(x_pos, frame_center):
+    def get_steering_values(self, x_pos, frame_center):
         return frame_center - x_pos
 
     def detect_blue_line(self, data):
+        print("executing blue line detection")
         QVGA_H, QVGA_W = (320, 240)
         FRAME_CENTER = QVGA_W // 2
-        roi = (0, 220, 240, 20)  # x, y, w, h
 
         # Color tracking thresholds (L min, L max, A min, A max, B min, B max).
         target_blue_thresh = [(18, 60, -6, 50, -80, -35)]
 
         # TODO: Apply lens correction value for a more wide-angle (fisheye) view.
         img = sensor.snapshot()
+
         # Only blobs that with more pixels than "pixel_threshold" and more area than "area_threshold" are
         # returned."merge=True" merges all overlapping blobs in the image.
-        for blob in img.find_blobs(target_blue_thresh, pixels_threshold=64, area_threshold=64, merge=True):
-            # Turn on for debugging purposes.
-            #img.draw_rectangle(blob.rect())
-            #img.draw_cross(blob.cx(), blob.cy())
+        detected_blobs = img.find_blobs(target_blue_thresh, pixels_threshold=64, area_threshold=64, merge=True)
+ 
+        if len(detected_blobs) > 0:
+            for blob in detected_blobs:
+                # Turn on for debugging purposes.
+                #img.draw_rectangle(blob.rect())
+                #img.draw_cross(blob.cx(), blob.cy())
 
-            if blob:
-                return(get_steering_values(blob.cx(), FRAME_CENTER))
-            else:
-                # Return a high negative value if no blob was detected.
-                return -1337
+                steering_val = self.get_steering_values(blob.cx(), FRAME_CENTER)
+                print(steering_val)
+                return str(steering_val).encode()
+        else:
+            # Return a high negative value if no blob was detected.
+            return "-1337".encode()
+
 
 
     ##########################################
