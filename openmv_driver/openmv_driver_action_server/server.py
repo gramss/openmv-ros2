@@ -115,10 +115,10 @@ class OpenMVDriverActionServer(Node):
 
         exec = self.executor
 
-        if fct_id == Message.SANITY_CHECK:
+        if fct_id == Message.SANITY_CHECK.value:
             self.cam.exe_sanity_check()
 
-        elif fct_id == Message.IMAGE:
+        elif fct_id == Message.IMAGE.value:
             node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, 'image', 10)
             width = 320
@@ -134,7 +134,7 @@ class OpenMVDriverActionServer(Node):
             exec.add_node(node)
             self._active_sub_node = node
 
-        elif fct_id == Message.QR_CODE_DETECTION:
+        elif fct_id == Message.QR_CODE_DETECTION.value:
             node = rclpy.create_node(self.get_name() + "qrcode", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "qrcode", 10)
             width = 320
@@ -154,7 +154,7 @@ class OpenMVDriverActionServer(Node):
             exec.add_node(node)
             self._active_sub_node = node
 
-        elif fct_id == Message.MOVEMENT_DETECTION:
+        elif fct_id == Message.MOVEMENT_DETECTION.value:
             node = rclpy.create_node(self.get_name() + "_movement", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "move_diff_image", 10) 
             trigger_pub = node.create_publisher(MovementTrigger, "movement_trigger", 10)
@@ -200,7 +200,7 @@ class OpenMVDriverActionServer(Node):
             self._active_coroutine = True
             exec.create_task(stream_movement)
 
-        elif fct_id == Message.LINE_DETECTION:
+        elif fct_id == Message.LINE_DETECTION.value:
             node = rclpy.create_node(self.get_name() + "line_detection", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "line_detection", 10)
             width = 320
