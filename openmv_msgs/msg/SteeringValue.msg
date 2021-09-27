@@ -1,1 +1,1 @@
-uint16 steering_value
+int16 steering_value
