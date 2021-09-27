@@ -51,7 +51,7 @@ class OMV_CAM:
     def exe_qrcode_detection(self):
         result = self.omv_interface.call("qrcode_detection")
         if result is not None:
-            return self.helper_bytes_to_image_raw(result.tobytes())
+            return result[0], self.helper_bytes_to_image_raw(result[1].tobytes())
 
     def exe_setup_line_detection(self):
         return self.omv_interface.call("setup_line_detection")

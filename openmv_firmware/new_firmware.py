@@ -72,10 +72,13 @@ class ROS2_Interface:
         img.lens_corr(1.2)
 
         codes = img.find_qrcodes()
+        result = list()
         if codes:
             for code in codes:
                 print("\t", len(codes)," QR code(s) detected")
                 print("\t", code.payload())
+
+                result.append(code.payload())
 
                 offset = 5
                 (bb_x, bb_y, bb_w, bb_h) = code.rect()
@@ -89,7 +92,7 @@ class ROS2_Interface:
                                 mono_space=False)
 
         # Return the camera frame (even) if no QR code was detected.
-        return img.compress(quality=90).bytearray()
+        return result, img.compress(quality=90).bytearray()
 
     def get_steering_values(x_pos, frame_center):
         return frame_center - x_pos

@@ -31,6 +31,8 @@ from rclpy.node import Node
 
 from openmv_driver_res import openmv_interface as oi
 
+from datetime import datetime
+
 from sensor_msgs.msg import Image, CompressedImage, CameraInfo
 
 
@@ -64,6 +66,8 @@ class OpenMVDriverActionServer(Node):
         
         self.cam = oi.OMV_CAM(name="normal", port=CAM_PORT)
         # self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+
+        self.qr_file = "/home/test.txt"
 
         self.get_logger().info("OpenMV action server ready")
 
@@ -173,15 +177,33 @@ class OpenMVDriverActionServer(Node):
         elif fct_id == Message.QR_CODE_DETECTION.value:
             node = rclpy.create_node(self.get_name() + "qrcode", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "qrcode", 10)
+            qr_pub = node.create_publisher(QRCode, "qrcode", 10)
             width = 320
             height = 240
+            self.qr_file = "/home/qr_code_" + datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3] + ".txt"
 
             self.cam.exe_setup_qr_mode()
 
             def timer_cb():
-                im = self.cam.exe_qrcode_detection()
+                now = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]
+                codes, im = self.cam.exe_qrcode_detection()
                 if im is not None:
                     self.pub_raw_image(node, im, im_pub, width, height)
+
+                if codes:
+                    msg = QRCode()
+                    msg.qrcodes = codes
+                    msg.timestamp = now
+                    qr_pub.publish()
+
+                    f = open(self.qr_file, "a")
+
+                    content = now
+                    for code in codes:
+                        content = content + " | " + code
+
+                    f.write(content)
+                    f.close()
 
             # Periodically execute the timer callback.
             timer_period = 0.5  # Seconds
