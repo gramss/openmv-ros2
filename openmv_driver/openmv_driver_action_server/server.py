@@ -21,7 +21,7 @@ import time
 from enum import Enum
 
 from openmv_msgs.action import Control
-from openmv_msgs.msg import QRCode, MovementTrigger
+from openmv_msgs.msg import QRCode, MovementTrigger, SteeringValue
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -202,16 +202,19 @@ class OpenMVDriverActionServer(Node):
 
         elif fct_id == Message.LINE_DETECTION.value:
             node = rclpy.create_node(self.get_name() + "line_detection", use_global_arguments=False, start_parameter_services=False)
-            im_pub = node.create_publisher(Image, "line_detection", 10)
+            publisher = node.create_publisher(SteeringValue, "line_detection_front", 10)
+            #publisher = node.create_publisher(SteeringValue, "line_detection_rear", 10)
+
             width = 320
             height = 240
 
             self.cam.exe_setup_line_detection()
 
             def timer_cb():
-                val = self.cam.exe_line_detection()
-                if im is not None:
-                    self.pub_raw_image(node, im, im_pub, width, height)
+                steering_value = self.cam.exe_line_detection()
+                msg = SteeringValue()
+                msg.data = int(steering_value)
+                publisher.publish(msg)
 
             # Periodically execute the timer callback.
             timer_period = 0.1  # Seconds
