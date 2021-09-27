@@ -51,7 +51,7 @@ class OMV_CAM:
     def exe_qrcode_detection(self):
         result = self.omv_interface.call("qrcode_detection")
         if result is not None:
-            return self.helper_bytes_to_image_raw(result.tobytes())
+            return result[0], self.helper_bytes_to_image_raw(result[1].tobytes())
 
     def exe_setup_line_detection(self):
         res = self.omv_interface.call("setup_line_detection")
@@ -123,14 +123,30 @@ class OMV_CAM:
             #print(result)
             return self.helper_bytes_to_image_raw(result.tobytes())
 
-    def exe_setup_im_stream(self):
+    ### movement stream functions
+
+    def exe_setup_movement_stream(self):
         result = self.omv_interface.call("setup_move_settings", recv_timeout=4000)
         if result is not None:
             return True
         return False
 
-    def exe_im_stream(self):
+    def exe_setup_image_stream(self):
+        result = self.omv_interface.call("setup_image_stream_settings", recv_timeout=4000)
+        if result is not None:
+            return True
+        return False
+
+    ### image stream functions
+
+    def exe_movement_im_stream(self):
         result = self.omv_interface.call("movement_im_stream")
+        if result is not None:
+            return True
+        return False
+
+    def exe_image_stream(self):
+        result = self.omv_interface.call("image_stream")
         if result is not None:
             return True
         return False
