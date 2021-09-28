@@ -266,7 +266,7 @@ class OpenMVDriverActionServer(Node):
                 #im_byte_arr = data[0:-1] #rest is image as jpg
                 if data is None:
                     miss_counter =+ 1
-                    if miss_counter > 50:
+                    if miss_counter > 5:
                         goal_handle.abort()
                     return
 
