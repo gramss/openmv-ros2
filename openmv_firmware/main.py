@@ -128,11 +128,6 @@ class ROS2_Interface:
             # Return a high negative value if no blob was detected.
             return "-1337".encode()
 
-
-    ###########################################
-    ### Sally's take at an image stream - PLEASE TEST
-    ################
-
     def stream_generator_cb(self):
         img = sensor.snapshot() # Take a picture and return the image.
         # Rotation.
