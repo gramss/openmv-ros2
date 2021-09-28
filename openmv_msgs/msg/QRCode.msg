@@ -1,1 +1,2 @@
-string qrcode
+string[] qrcodes
+string timestamp

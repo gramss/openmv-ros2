@@ -13,6 +13,8 @@
 # limitations under the License.
 
 
+from typing import re
+from builtins import type
 from openmv_driver_res.rpc import rpc
 
 import json, serial, serial.tools.list_ports, struct, sys, datetime
@@ -44,10 +46,23 @@ class OMV_CAM:
         # else:
         #     print("nope!")
 
-    # def exe_qrcode_detection(self):
-    #     result = self.omv_interface.call("qrcode_detection")
-    #     if result is not None and len(result):
-    #         return(result.tobytes())
+    def exe_setup_qr_mode(self):
+        return self.omv_interface.call("setup_qr_mode")
+
+    def exe_qrcode_detection(self):
+        result = self.omv_interface.call("qrcode_detection")
+        if result is not None:
+            return result[0], self.helper_bytes_to_image_raw(result[1].tobytes())
+
+    def exe_setup_line_detection(self):
+        res = self.omv_interface.call("setup_line_detection")
+        if res is not None:
+            return res
+
+    def exe_line_detection(self):
+        res = self.omv_interface.call("detect_blue_line")
+        if res is not None:
+            return res
 
     # def exe_all_qrcode_detection(self):
     #     result = self.omv_interface.call("all_qrcode_detection")
@@ -111,28 +126,39 @@ class OMV_CAM:
         else:
             return False
 
+    ### movement stream functions
 
-    def exe_setup_im_stream(self):
+    def exe_setup_movement_stream(self):
         result = self.omv_interface.call("setup_move_settings", recv_timeout=4000)
         if result is not None:
             return True
         return False
 
-    def exe_im_stream(self):
+    def exe_setup_image_stream(self, data):
+        result = self.omv_interface.call("setup_image_stream_settings", data, recv_timeout=4000)
+        if result is not None:
+            return True
+        return False
+
+    ### image stream functions
+
+    def exe_movement_im_stream(self):
         result = self.omv_interface.call("movement_im_stream")
         if result is not None:
             return True
         return False
 
-    def exe_mov_triggered(self):
-        return self.omv_interface.call("mov_triggered")
-
+    def exe_image_stream(self):
+        result = self.omv_interface.call("image_stream")
+        if result is not None:
+            return True
+        return False
 
     def helper_bytes_to_image_raw(self, im_bytes, width=320, height=240):
         #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
         try:
             im = PILImage.frombuffer("RGB",
-                                    (width,height),
+                                    (width, height),
                                     im_bytes, "jpeg", "RGB", "")
             b, g, r = im.split()
             return PILImage.merge("RGB", (r, g, b))

@@ -17,13 +17,13 @@
 # http://marc.merlins.org/perso/linux/post_2018-12-20_Accessing-USB-Devices-In-Docker-_ttyUSB0_-dev-bus-usb-_-for-fastboot_-adb_-without-using-privileged.html
 
 
-
 import time
+from enum import Enum
 
 import serial
 
 from openmv_msgs.action import Control
-from openmv_msgs.msg import QRCode, MovementTrigger
+from openmv_msgs.msg import QRCode, MovementTrigger, SteeringValue
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -33,7 +33,22 @@ from rclpy.node import Node
 
 from openmv_driver_res import openmv_interface as oi
 
+from datetime import datetime
+
 from sensor_msgs.msg import Image, CompressedImage, CameraInfo
+
+
+CAM_PORT = "/dev/ttyACM0"
+
+
+class Message(Enum):
+    SANITY_CHECK = 0
+    IMAGE_LO_RES = 1
+    IMAGE_HI_RES = 2
+    QR_CODE_DETECTION = 3
+    MOVEMENT_DETECTION = 4
+    LINE_DETECTION = 5
+
 
 class OpenMVDriverActionServer(Node):
 
@@ -52,9 +67,13 @@ class OpenMVDriverActionServer(Node):
             callback_group=ReentrantCallbackGroup(),
             goal_callback=self.goal_callback,
             cancel_callback=self.cancel_callback)
-        
-        self.cam = None #oi.OMV_CAM(name="normal", port="/dev/ttyACM0")
-        self.cam_FLIR = None #oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+
+        self.cam = oi.OMV_CAM(name="normal", port=CAM_PORT)
+        # self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
+
+        self.qr_file = "/home/test.txt"
+
+        self.get_logger().info("OpenMV action server ready")
 
     def destroy(self):
         self._action_server.destroy()
@@ -72,7 +91,7 @@ class OpenMVDriverActionServer(Node):
             self.get_logger().info('Aborting previous goal')
             # Abort the existing goal
             self._goal_handle.abort()
-        
+
         if self._active_coroutine is True:
             self._active_coroutine = None
             #self.executor.spin_until_future_complete(self._future_coroutine)
@@ -85,7 +104,6 @@ class OpenMVDriverActionServer(Node):
             self._active_sub_node.destroy_node()
             self._active_sub_node = None
             time.sleep(5)
-        
 
         self._goal_handle = goal_handle
         # Start goal execution right away
@@ -100,80 +118,119 @@ class OpenMVDriverActionServer(Node):
         """Execute a goal."""
         self.get_logger().info('Executing goal...')
         gh = goal_handle
-        
+
         self.give_feedback(gh, 0)
 
         fct_id = goal_handle.request.function  # here is the enum inside..
 
         exec = self.executor
 
-        
+        if fct_id == Message.SANITY_CHECK.value:
+            self.cam.exe_sanity_check()
 
-        if fct_id == 0:
-            result = self.cam.exe_sanity_check()
-            if result is not None:
-                self.get_logger().info("Sanity call - success: " + str(result.tobytes()))
-                goal_handle.succeed()
-                return self.generate_result()
+        elif fct_id == Message.IMAGE_LO_RES.value or fct_id == Message.IMAGE_HI_RES.value:
+            if fct_id == Message.IMAGE_LO_RES.value:
+                img_w, img_h = (320, 240)
+                resolution = "QVGA"
             else:
-                #self.give_feedback(gh,3)
-                goal_handle.abort()
-                # Is a return needed..?
-                return self.generate_result()
+                img_w, img_h = (640, 480)
+                resolution = "VGA"
 
-        elif fct_id ==1:
-            # This needs to be rewritten to a streamer like #3 or another function added as a streamer with normal video stream
             node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
-            im_pub = node.create_publisher(Image, 'image', 10)
+            im_pub = node.create_publisher(Image, "image", 10)
+
+            """def timer_cb():
+                im = self.cam.exe_jpeg_snapshot(node.get_logger())
+                if im is not None:
+                    self.pub_raw_image(node, im, im_pub, width, height)
+
+
+            timer_period = 0.5  # seconds
+            timer = node.create_timer(timer_period, timer_cb)
+            exec.add_node(node)
+            self._active_sub_node = node"""
+
+            def stream_cb(data):
+                #node.get_logger().info("stream_cb says hi")
+                #trigger = data[-1:] #tailing byte is trigger byte
+                #im_bytes = data[0:-1] #rest is image as jpg
+                #print(type(data))
+                im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_w, height=img_h)
+                self.pub_raw_image(node, im, im_pub, img_w, img_h)
+
+                #msg = MovementTrigger()
+                #msg.trigger = trigger
+                #trigger_pub.publish(msg)
+
+            async def stream_image():
+                #while rclpy.ok() and self._active_coroutine is True:
+                if self.cam.exe_setup_image_stream(resolution):
+                    res = self.cam.exe_image_stream()
+                    #time.sleep(2) #wait til cam gets ready..!
+                    node.get_logger().info("Active_coroutine?= " + str(self._active_coroutine))
+                    if res is not None:
+                        self.cam.omv_interface.stream_reader(stream_cb,
+                            queue_depth=8, 
+                            read_timeout_ms=2500,
+                            keep_looping=self._active_coroutine)
+                        node.get_logger().info("Finished openmv image stream_loop")
+                    else:
+                        node.get_logger().error("Could not start image stream")
+                        return False
+                else:
+                    node.get_logger().warn("Failed to setup cam for image sream")
+                    return False
+
+            exec.add_node(node)
+            self._active_sub_node = node
+            self._active_coroutine = True
+            exec.create_task(stream_image)
+
+        elif fct_id == Message.QR_CODE_DETECTION.value:
+            node = rclpy.create_node(self.get_name() + "qrcode", use_global_arguments=False, start_parameter_services=False)
+            im_pub = node.create_publisher(Image, "qrcode", 10)
+            qr_pub = node.create_publisher(QRCode, "qrcode", 10)
             width = 320
             height = 240
-            miss_counter = 0
+            self.qr_file = "/home/qr_code_" + datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3] + ".txt"
+
+            self.cam.exe_setup_qr_mode()
 
             def timer_cb():
-                im = self.cam.exe_jpeg_snapshot(node.get_logger())
-                if im is not False:
+                now = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]
+                codes, im = self.cam.exe_qrcode_detection()
+                if im is not None:
                     self.pub_raw_image(node, im, im_pub, width, height)
-                else:
-                    self.get_logger().warn("Missed picture from cam..")
-                    miss_counter =+ 1
-                    if miss_counter > 50:
-                        self.get_logger().error("Too much misses from cam. Dropping 2Hz stream")
-                        
 
+                if codes:
+                    msg = QRCode()
+                    msg.qrcodes = codes
+                    msg.timestamp = now
+                    qr_pub.publish()
 
-            timer_period = 0.5  # seconds
-            timer = node.create_timer(timer_period, timer_cb)
-            exec.add_node(node)
-            self._active_sub_node = node
-            goal_handle.succeed()
+                    f = open(self.qr_file, "a")
 
-        elif fct_id == 2:
-            #never tested
-            node = rclpy.create_node(self.get_name() + "qrcode", use_global_arguments=False, start_parameter_services=False)
-            publisher = node.create_publisher(QRCode, 'qrcode', 10)
-            
-            def timer_cb():
-                self.give_feedback(goal_handle, 1)
-                result = self.cam.exe_qrcode_detection()
-                if result is None:
-                    result = "No QR code found"
-                msg = QRCode()
-                msg.qrcode = result
-                publisher.publish(msg)
+                    content = now
+                    for code in codes:
+                        content = content + " | " + code
 
-            timer_period = 0.5  # seconds
-            timer = node.create_timer(timer_period, timer_cb)
+                    f.write(content)
+                    f.close()
+
+            # Periodically execute the timer callback.
+            timer_period = 0.5  # Seconds
+            node.create_timer(timer_period, timer_cb)
+
             exec.add_node(node)
             self._active_sub_node = node
 
-        elif fct_id == 3:
+        elif fct_id == Message.MOVEMENT_DETECTION.value:
             node = rclpy.create_node(self.get_name() + "_movement", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "move_diff_image", 10) 
-            #trigger_pub = node.create_publisher(MovementTrigger, "movement_trigger", 10)
-            
+            trigger_pub = node.create_publisher(MovementTrigger, "movement_trigger", 10)
+
             width = 320
             height = 240
-            miss_counter = 0
 
             self._active_coroutine = True
 
@@ -192,19 +249,14 @@ class OpenMVDriverActionServer(Node):
                 #im = self.cam.helper_bytes_to_image_raw(bytes(im_byte_arr)) #im_byte_arr)
                 self.pub_raw_image(node, im, im_pub, width, height)
 
-                # # Does not work that way as we would cancel the stream with a different request.
-                # trigger = self.cam.exe_mov_triggered()
-                # print(type(trigger))
-                # msg = MovementTrigger()
-                # msg.trigger = bool(trigger)
-                # trigger_pub.publish(msg)
-
-
+                #msg = MovementTrigger()
+                #msg.trigger = trigger
+                #trigger_pub.publish(msg)
 
             async def stream_movement():
                 #while rclpy.ok() and self._active_coroutine is True:
-                if self.cam.exe_setup_im_stream():
-                    res = self.cam.exe_im_stream()
+                if self.cam.exe_setup_movement_stream():
+                    res = self.cam.exe_movement_im_stream()
                     #time.sleep(2) #wait til cam gets ready..!
                     node.get_logger().info("Active_coroutine?= " + str(self._active_coroutine))
                     if res is not None:
@@ -212,66 +264,48 @@ class OpenMVDriverActionServer(Node):
                             queue_depth=8, 
                             read_timeout_ms=2500,
                             keep_looping=self._active_coroutine)
-                        node.get_logger().info("Finished openmv stream_loop")
+                        node.get_logger().info("Finished openmv movement stream_loop")
                     else:
-                        node.get_logger().error("Could not start stream")
+                        node.get_logger().error("Could not start movement stream")
                         return False
                 else:
                     node.get_logger().warn("Failed to setup cam for stream_movement")
                     return False
-                        
-                
 
-                        
-            
             exec.add_node(node)
             self._active_sub_node = node
             self._active_coroutine = True
-            self._future_coroutine = exec.create_task(stream_movement)
-            goal_handle.succeed()
-            #exec.spin_until_future_complete(self._future_coroutine)
-            
+            exec.create_task(stream_movement)
 
-        if fct_id == 4: #reset cam
-            if self.cam is not None:
-                del self.cam.omv_interface #.reset()
-                self.cam = None
-            if self.cam_FLIR is not None:
-                self.cam_FLIR.omv_interface.reset()
-                self.cam_FLIR = None
-            goal_handle.succeed()
+        elif fct_id == Message.LINE_DETECTION.value:
+            node = rclpy.create_node(self.get_name() + "line_detection", use_global_arguments=False, start_parameter_services=False)
+            publisher = node.create_publisher(SteeringValue, "line_detection_front", 10)
+            #publisher = node.create_publisher(SteeringValue, "line_detection_rear", 10)
 
-        if fct_id == 5: #start cam 1
-            try:
-                self.cam = oi.OMV_CAM(name="normal", port="/dev/ttyACM0")
-                goal_handle.succeed()   
-            except serial.SerialException as e:
-                self.get_logger().error(e.strerror)
-                goal_handle.abort()
+            width = 320
+            height = 240
 
-        if fct_id == 6: #start FLIR Cam 2
-            try:
-                self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
-                goal_handle.succeed()
-            except serial.SerialException as e:
-                self.get_logger().error(e.strerror)
-                goal_handle.abort()
+            self.cam.exe_setup_line_detection()
 
+            def timer_cb():
+                steering_val = self.cam.exe_line_detection()
 
+                if steering_val is not None:
+                    msg = SteeringValue()
+                    msg.steering_value = int(steering_val.tobytes())
+                    publisher.publish(msg)
 
-        #please put in enum-switch that is not ultimativ ugly...
-        # also put in ref to self / node, so that the exe_fct. can add publisher and stuff
+            # Periodically execute the timer callback.
+            timer_period = 0.5  # Seconds
+            node.create_timer(timer_period, timer_cb)
+
+            exec.add_node(node)
+            self._active_sub_node = node
+
+        # TODO: put in ref to self / node, so that the exe_fct. can add publisher and stuff
         # maybe a good thing would be to add a type and name .... hmmmmmmmm
 
-        # while (rclpy.ok()):
-        #     self.give_feedback(gh, 1) #everything still fine
-        #     exec.spin_once()
-        #     if self._future_coroutine is not None:
-        #         exec.spin_once_until_future_complete(self._future_coroutine)
-            
-        
-        
-        #goal_handle.succeed()
+        goal_handle.succeed()
 
         return self.generate_result()
 
@@ -296,6 +330,7 @@ class OpenMVDriverActionServer(Node):
         rawmsg.data = im.tobytes()
         rawmsg.step = int(len(rawmsg.data)/rawmsg.height)
         publisher.publish(rawmsg)
+
 
 def main(args=None):
     rclpy.init(args=args)
