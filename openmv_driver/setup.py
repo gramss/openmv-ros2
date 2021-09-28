@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools', 'pyserial'],
+    install_requires=['setuptools', 'pyserial', 'pillow'],
     zip_safe=True,
     author='Florian Gramß',
     author_email='flo.gramss@gmail.com',
