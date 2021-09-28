@@ -173,10 +173,10 @@ class OpenMVDriverActionServer(Node):
                 #im_bytes = data[0:-1] #rest is image as jpg
                 #print(type(data))
                 if color == "RGB":
-                    im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_w, height=img_h)
+                    im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_h, height=img_w)
                 else:
-                    im = self.cam.helper_bytes_to_image_raw_grayscale(bytes(data), width=img_w, height=img_h)
-                self.pub_raw_image(node, im, im_pub, img_w, img_h)
+                    im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_h, height=img_w)
+                self.pub_raw_image(node, im, im_pub, img_h, img_w)
 
                 #msg = MovementTrigger()
                 #msg.trigger = trigger
@@ -199,7 +199,7 @@ class OpenMVDriverActionServer(Node):
                         node.get_logger().error("Could not start image stream")
                         return False
                 else:
-                    node.get_logger().warn("Failed to setup cam for image sream")
+                    node.get_logger().warn("Failed to setup cam for image stream")
                     return False
 
             exec.add_node(node)

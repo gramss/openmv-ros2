@@ -157,13 +157,13 @@ class OMV_CAM:
     def helper_bytes_to_image_raw(self, im_bytes, width=320, height=240):
         #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
         try:
-            im = PILImage.frombufferRGB("RGB",
+            im = PILImage.frombuffer("RGB",
                                     (width, height),
                                     im_bytes, "jpeg", "RGB", "")
             b, g, r = im.split()
-            return PILImage.merge("", (r, g, b))
+            return PILImage.merge("RGB", (r, g, b))
         except Exception as e:
-                print ("Exception loading PILImage.frombuffer: ", e)
+                print ("Exception loading PILImage.frombuffer (rgb): ", e)
                 return None
 
     def helper_bytes_to_image_raw_grayscale(self, im_bytes, width=320, height=240):
@@ -172,9 +172,8 @@ class OMV_CAM:
             im = PILImage.frombuffer("L",
                                     (width, height),
                                     im_bytes, "jpeg", "L", "")
-            #b, g, r = im.split()
-            print(len(im[0]))
-            return im
+            g = im.split()
+            return PILImage.merge("L", g)
         except Exception as e:
-                print ("Exception loading PILImage.frombuffer: ", e)
+                print ("Exception loading PILImage.frombuffer (grayscale): ", e)
                 return None
