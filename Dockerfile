@@ -36,8 +36,8 @@ RUN source /opt/ros/foxy/setup.bash \
 
 # build other nodes after interface to find interface messages in those nodes
 RUN source /opt/ros/foxy/setup.bash \
+    && MAKEFLAGS="-j1 -l1" colcon build --symlink-install --executor sequential \
     && source /home/iotbot_ws/install/setup.bash \
-    && MAKEFLAGS="-j1 -l1" colcon build --symlink-install --executor sequential
     # && colcon test
 
 # write source commands to .bashrc -> no need to source afterwards
@@ -46,6 +46,6 @@ RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc \
 
 # Run the Node as soon a the container is started
 CMD source /opt/ros/foxy/setup.bash && \
-    source /home/iotbot_ws/install/setup.bash
+    source /home/iotbot_ws/install/setup.bash && \
     ros2 run openmv_driver_action_server server
 
