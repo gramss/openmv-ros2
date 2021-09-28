@@ -153,11 +153,23 @@ class ROS2_Interface:
         return "Ready".encode()
 
 
-    # ToDo: Check these settings!
     def setup_image_stream_settings(self, data):
-        sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
-        sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
-        sensor.set_auto_whitebal(False) # Turn off white balance.
+        print("setup_image_stream_settings")
+        sensor.set_pixformat(sensor.RGB565)
+        res = bytes(data).decode()
+        if res == "QVGA":
+            sensor.set_framesize(sensor.QVGA)
+            print("resolution set to QVGA (320x240)")
+        elif res == "VGA":
+            sensor.set_framesize(sensor.VGA)
+            print("resolution set to VGA (640x480)")
+        else:
+            # Fallback to a rather low resolution.
+            sensor.set_framesize(sensor.QVGA)
+            print("resolution set to QVGA (fallback)")
+
+        sensor.set_auto_whitebal(False)
+        sensor.skip_frames(time=2000)
 
         """ # probably dont need this
         self.extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
@@ -278,7 +290,7 @@ blue_led = LED(3)
 blue_led.on()
 
 #time.sleep_ms(4000)
-uart.write("hello terminal\n")
+print("hello terminal")
 #blue_led.off()
 
 A = ROS2_Interface()

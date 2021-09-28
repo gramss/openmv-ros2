@@ -41,10 +41,11 @@ CAM_PORT = "/dev/ttyACM0"
 
 class Message(Enum):
     SANITY_CHECK = 0
-    IMAGE = 1
-    QR_CODE_DETECTION = 2
-    MOVEMENT_DETECTION = 3
-    LINE_DETECTION = 4
+    IMAGE_LO_RES = 1
+    IMAGE_HI_RES = 2
+    QR_CODE_DETECTION = 3
+    MOVEMENT_DETECTION = 4
+    LINE_DETECTION = 5
 
 
 class OpenMVDriverActionServer(Node):
@@ -63,7 +64,7 @@ class OpenMVDriverActionServer(Node):
             callback_group=ReentrantCallbackGroup(),
             goal_callback=self.goal_callback,
             cancel_callback=self.cancel_callback)
-        
+
         self.cam = oi.OMV_CAM(name="normal", port=CAM_PORT)
         # self.cam_FLIR = oi.OMV_CAM(name="FLIR", port="/dev/ttyACM1")
 
@@ -122,11 +123,16 @@ class OpenMVDriverActionServer(Node):
         if fct_id == Message.SANITY_CHECK.value:
             self.cam.exe_sanity_check()
 
-        elif fct_id == Message.IMAGE.value:
+        elif fct_id == Message.IMAGE_LO_RES.value or fct_id == Message.IMAGE_HI_RES.value:
+            if fct_id == Message.IMAGE_LO_RES.value:
+                img_w, img_h = (320, 240)
+                resolution = "QVGA"
+            else:
+                img_w, img_h = (640, 480)
+                resolution = "VGA"
+
             node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
-            im_pub = node.create_publisher(Image, 'image', 10)
-            width = 320
-            height = 240
+            im_pub = node.create_publisher(Image, "image", 10)
 
             """def timer_cb():
                 im = self.cam.exe_jpeg_snapshot(node.get_logger())
@@ -142,9 +148,9 @@ class OpenMVDriverActionServer(Node):
                 #node.get_logger().info("stream_cb says hi")
                 #trigger = data[-1:] #tailing byte is trigger byte
                 #im_bytes = data[0:-1] #rest is image as jpg
-                print(type(data))
-                im = self.cam.helper_bytes_to_image_raw(bytes(data)) #im_bytes)
-                self.pub_raw_image(node, im, im_pub, width, height)
+                #print(type(data))
+                im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_w, height=img_h)
+                self.pub_raw_image(node, im, im_pub, img_w, img_h)
 
                 #msg = MovementTrigger()
                 #msg.trigger = trigger
@@ -152,12 +158,12 @@ class OpenMVDriverActionServer(Node):
 
             async def stream_image():
                 #while rclpy.ok() and self._active_coroutine is True:
-                if self.cam.exe_setup_image_stream():
+                if self.cam.exe_setup_image_stream(resolution):
                     res = self.cam.exe_image_stream()
                     #time.sleep(2) #wait til cam gets ready..!
                     node.get_logger().info("Active_coroutine?= " + str(self._active_coroutine))
                     if res is not None:
-                        self.cam.omv_interface.stream_reader(stream_cb, 
+                        self.cam.omv_interface.stream_reader(stream_cb,
                             queue_depth=8, 
                             read_timeout_ms=2500,
                             keep_looping=self._active_coroutine)

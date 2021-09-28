@@ -131,8 +131,8 @@ class OMV_CAM:
             return True
         return False
 
-    def exe_setup_image_stream(self):
-        result = self.omv_interface.call("setup_image_stream_settings", recv_timeout=4000)
+    def exe_setup_image_stream(self, data):
+        result = self.omv_interface.call("setup_image_stream_settings", data, recv_timeout=4000)
         if result is not None:
             return True
         return False
