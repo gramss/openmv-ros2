@@ -43,8 +43,10 @@ CAM_PORT = "/dev/ttyACM0"
 
 class Message(Enum):
     SANITY_CHECK = 0
-    IMAGE_LO_RES = 1
-    IMAGE_HI_RES = 2
+    IMAGE_LO_RES = 11
+    IMAGE_HI_RES = 21
+    IMAGE_LO_RES_GRAY = 10
+    IMAGE_Hi_RES_GRAY = 20
     QR_CODE_DETECTION = 3
     MOVEMENT_DETECTION = 4
     LINE_DETECTION = 5
@@ -128,23 +130,38 @@ class OpenMVDriverActionServer(Node):
         if fct_id == Message.SANITY_CHECK.value:
             self.cam.exe_sanity_check()
 
-        elif fct_id == Message.IMAGE_LO_RES.value or fct_id == Message.IMAGE_HI_RES.value:
+        elif fct_id == Message.IMAGE_LO_RES.value or \
+             fct_id == Message.IMAGE_HI_RES.value or \
+             fct_id == Message.IMAGE_LO_RES_GRAY.value or \
+             fct_id == Message.IMAGE_HI_RES_GRAY.value:
             if fct_id == Message.IMAGE_LO_RES.value:
+                print("received: QVGA, RGB")
                 img_w, img_h = (320, 240)
                 resolution = "QVGA"
-            else:
+                color = "RGB"
+            elif fct_id == Message.IMAGE_HI_RES.value:
+                print("received: VGA, RGB")
                 img_w, img_h = (640, 480)
                 resolution = "VGA"
+                color = "RGB"
+            elif fct_id == Message.IMAGE_LO_RES_GRAY.value:
+                print("received: QVGA, GRAY")
+                img_w, img_h = (320, 240)
+                resolution = "QVGA"
+                color = "GRAY"
+            else:
+                print("received: VGA, GRAY")
+                img_w, img_h = (320, 240)
+                resolution = "VGA"
+                color = "GRAY"
 
-            node = rclpy.create_node(self.get_name() + "_image_2Hz", use_global_arguments=False, start_parameter_services=False)
+            node = rclpy.create_node(self.get_name() + "_image", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "image", 10)
 
             """def timer_cb():
                 im = self.cam.exe_jpeg_snapshot(node.get_logger())
                 if im is not None:
                     self.pub_raw_image(node, im, im_pub, width, height)
-
-
             timer_period = 0.5  # seconds
             timer = node.create_timer(timer_period, timer_cb)
             exec.add_node(node)
@@ -155,7 +172,10 @@ class OpenMVDriverActionServer(Node):
                 #trigger = data[-1:] #tailing byte is trigger byte
                 #im_bytes = data[0:-1] #rest is image as jpg
                 #print(type(data))
-                im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_w, height=img_h)
+                if color == "RGB":
+                    im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_w, height=img_h)
+                else:
+                    im = self.cam.helper_bytes_to_image_raw_grayscale(bytes(data), width=img_w, height=img_h)
                 self.pub_raw_image(node, im, im_pub, img_w, img_h)
 
                 #msg = MovementTrigger()
@@ -164,7 +184,8 @@ class OpenMVDriverActionServer(Node):
 
             async def stream_image():
                 #while rclpy.ok() and self._active_coroutine is True:
-                if self.cam.exe_setup_image_stream(resolution):
+                data = color + "," + resolution
+                if self.cam.exe_setup_image_stream(data):
                     res = self.cam.exe_image_stream()
                     #time.sleep(2) #wait til cam gets ready..!
                     node.get_logger().info("Active_coroutine?= " + str(self._active_coroutine))

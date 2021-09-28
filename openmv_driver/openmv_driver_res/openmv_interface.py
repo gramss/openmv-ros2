@@ -134,7 +134,7 @@ class OMV_CAM:
             return True
         return False
 
-    def exe_setup_image_stream(self, data):
+    def exe_setup_image_stream(self, data: str):
         result = self.omv_interface.call("setup_image_stream_settings", data, recv_timeout=4000)
         if result is not None:
             return True
@@ -157,11 +157,24 @@ class OMV_CAM:
     def helper_bytes_to_image_raw(self, im_bytes, width=320, height=240):
         #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
         try:
-            im = PILImage.frombuffer("RGB",
+            im = PILImage.frombufferRGB("RGB",
                                     (width, height),
                                     im_bytes, "jpeg", "RGB", "")
             b, g, r = im.split()
-            return PILImage.merge("RGB", (r, g, b))
+            return PILImage.merge("", (r, g, b))
+        except Exception as e:
+                print ("Exception loading PILImage.frombuffer: ", e)
+                return None
+
+    def helper_bytes_to_image_raw_grayscale(self, im_bytes, width=320, height=240):
+        #from https://github.com/TRI-jaguar4x4/jpeg_to_raw/blob/master/jpeg_to_raw/jpeg_to_raw.py
+        try:
+            im = PILImage.frombuffer("L",
+                                    (width, height),
+                                    im_bytes, "jpeg", "L", "")
+            #b, g, r = im.split()
+            print(len(im[0]))
+            return im
         except Exception as e:
                 print ("Exception loading PILImage.frombuffer: ", e)
                 return None
