@@ -23,13 +23,14 @@ from enum import Enum
 import serial
 
 from openmv_msgs.action import Control
-from openmv_msgs.msg import QRCode, MovementTrigger, SteeringValue
+from openmv_msgs.msg import QRCode, MovementTrigger, SteeringValue, ImageRawBytes
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 
 from openmv_driver_res import openmv_interface as oi
 
@@ -157,6 +158,7 @@ class OpenMVDriverActionServer(Node):
 
             node = rclpy.create_node(self.get_name() + "_image", use_global_arguments=False, start_parameter_services=False)
             im_pub = node.create_publisher(Image, "image", 10)
+            im_pub_raw = node.create_publisher(ImageRawBytes, "image_raw_bytes", qos_profile=qos_profile_sensor_data)
 
             """def timer_cb():
                 im = self.cam.exe_jpeg_snapshot(node.get_logger())
@@ -171,16 +173,19 @@ class OpenMVDriverActionServer(Node):
                 #node.get_logger().info("stream_cb says hi")
                 #trigger = data[-1:] #tailing byte is trigger byte
                 #im_bytes = data[0:-1] #rest is image as jpg
-                #print(type(data))
+
+                raw_bytes = str(data)
+                msg = ImageRawBytes()
+                msg.img_raw_bytes = raw_bytes
+                im_pub_raw.publish(msg)
+
+                """
                 if color == "RGB":
                     im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_h, height=img_w)
                 else:
                     im = self.cam.helper_bytes_to_image_raw(bytes(data), width=img_h, height=img_w)
                 self.pub_raw_image(node, im, im_pub, img_h, img_w)
-
-                #msg = MovementTrigger()
-                #msg.trigger = trigger
-                #trigger_pub.publish(msg)
+                """
 
             async def stream_image():
                 #while rclpy.ok() and self._active_coroutine is True:

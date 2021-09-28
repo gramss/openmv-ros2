@@ -12,6 +12,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/QRCode.msg"
   "msg/MovementTrigger.msg"
   "msg/SteeringValue.msg"
+  "msg/ImageRawBytes.msg"
   DEPENDENCIES builtin_interfaces std_msgs action_msgs
 )
 
