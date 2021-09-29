@@ -215,6 +215,24 @@ class ROS2_Interface:
         diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
         triggered = diff > self.TRIGGER_THRESHOLD
 
+
+        thresholds = [(5, 100, -128, 127, -128, 127)]
+
+        blobs = img.find_blobs(thresholds, pixels_threshold=100, area_threshold=100)
+        if blobs:
+            for blob in blobs:
+                # These values depend on the blob not being circular - otherwise they will be shaky.
+                #if blob.elongation() > 0.5:
+                #    img.draw_edges(blob.min_corners(), color=(255,0,0))
+                #    img.draw_line(blob.major_axis_line(), color=(0,255,0))
+                #    img.draw_line(blob.minor_axis_line(), color=(0,0,255))
+                # These values are stable all the time.
+                img.draw_rectangle(blob.rect())
+                #img.draw_cross(blob.cx(), blob.cy())
+                # Note - the blob rotation is unique to 0-180 only.
+                #img.draw_keypoints([(blob.cx(), blob.cy(), int(math.degrees(blob.rotation())))], size=20)
+
+
         return img.compress(quality=90).bytearray()
 
         #prepare bytearray() to send as stream - bytearray() is actually just a ref to heap, so extending means copying which is "bad". See Issue
