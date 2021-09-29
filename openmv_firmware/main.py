@@ -14,8 +14,8 @@ class ROS2_Interface:
     def __init__(self):
         # Things needed for movement detection
         self.TRIGGER_THRESHOLD = 5
-        self.BG_UPDATE_FRAMES = 50 # How many frames before blending.
-        self.BG_UPDATE_BLEND = 128 # How much to blend by... ([0-256]==[0.0-1.0]).
+        self.BG_UPDATE_FRAMES = 5  # How many frames before blending.
+        self.BG_UPDATE_BLEND = 16  # How much to blend by ([0-256]==[0.0-1.0]).
         self.frame_count = 0
 
         sensor.reset()
@@ -215,12 +215,12 @@ class ROS2_Interface:
         diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
         triggered = diff > self.TRIGGER_THRESHOLD
 
-
+        # Blob detection.
+        # Generic threshold including all colors (and )
         thresholds = [(5, 100, -128, 127, -128, 127)]
-
-        blobs = img.find_blobs(thresholds, pixels_threshold=100, area_threshold=100)
-        if blobs:
-            for blob in blobs:
+        detected_blobs = img.find_blobs(thresholds, pixels_threshold=50, area_threshold=50, merge=True)
+        if detected_blobs:
+            for blob in detected_blobs:
                 # These values depend on the blob not being circular - otherwise they will be shaky.
                 #if blob.elongation() > 0.5:
                 #    img.draw_edges(blob.min_corners(), color=(255,0,0))
