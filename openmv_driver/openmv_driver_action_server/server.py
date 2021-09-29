@@ -157,8 +157,8 @@ class OpenMVDriverActionServer(Node):
                 color = "GRAY"
 
             node = rclpy.create_node(self.get_name() + "_image", use_global_arguments=False, start_parameter_services=False)
-            im_pub = node.create_publisher(Image, "image", 10)
-            im_pub_raw = node.create_publisher(ImageRawBytes, "image_raw_bytes", qos_profile=qos_profile_sensor_data)
+            im_pub = node.create_publisher(Image, "image", qos_profile=qos_profile_sensor_data)
+            #im_pub_raw = node.create_publisher(ImageRawBytes, "image_raw_bytes", qos_profile=qos_profile_sensor_data)
 
             """def timer_cb():
                 im = self.cam.exe_jpeg_snapshot(node.get_logger())
