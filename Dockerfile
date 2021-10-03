@@ -18,7 +18,9 @@ RUN apt-get update \
 # Set up iotbot workspace.
 RUN mkdir -p /home/iotbot_ws/src/iotbot
 WORKDIR /home/iotbot_ws
-RUN cd src/ && git clone https://github.com/gramss/openmv-ros2
+# RUN cd src/ && git clone https://github.com/gramss/openmv-ros2
+
+ADD ./ src/OpenMV-ros2
 
 # Look for ROS2 package dependencies.
 # rodsep            https://docs.ros.org/en/independent/api/rosdep/html/commands.html
