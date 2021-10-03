@@ -18,7 +18,7 @@
 #include <string>
 
 #include "nav2_behavior_tree/bt_action_node.hpp"
-#include "openmv_msgs/action/Control.hpp"
+#include "openmv_msgs/action/control.hpp"
 
 namespace openmv_bt_plugins
 {
